@@ -79,7 +79,7 @@ apache:
         vitexconsole:
             servername: nfqakademija.dev
             serveraliases: []
-            docroot: /var/www/public/nfqakademija/web
+            docroot: /var/www/nfqakademija/web
             port: '80'
             setenv:
                 - 'APP_ENV dev'
@@ -179,6 +179,9 @@ ruby:
     versions:
         1JM4KdOvbxCO:
             version: ''
+    gems:
+        - sass
+        - compass
 nodejs:
     install: '1'
     npm_packages: {  }
