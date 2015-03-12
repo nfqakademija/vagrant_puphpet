@@ -1,4 +1,4 @@
-if $yaml_values == undef { $yaml_values = loadyaml('/vagrant/puphpet/config.yaml') }
+if $yaml_values == undef { $yaml_values = merge_yaml('/vagrant/puphpet/config.yaml', '/vagrant/puphpet/config-custom.yaml') }
 if $nginx_values == undef { $nginx_values = $yaml_values['nginx'] }
 if $php_values == undef { $php_values = hiera_hash('php', false) }
 if $hhvm_values == undef { $hhvm_values = hiera_hash('hhvm', false) }
@@ -13,35 +13,18 @@ if hash_key_equals($nginx_values, 'install', 1) {
 
   class { 'puphpet::ssl_cert': }
 
-  $webroot_location     = $puphpet::params::nginx_webroot_location
-  $nginx_provider_types = [
-    'virtualbox',
-    'vmware_fusion',
-    'vmware_desktop',
-    'parallels'
-  ]
+  $www_location  = $puphpet::params::nginx_www_location
+  $webroot_user  = 'www-data'
+  $webroot_group = 'www-data'
 
-  exec { "mkdir -p ${webroot_location}":
-    creates => $webroot_location,
-  }
-
-  if downcase($::provisioner_type) in $nginx_provider_types {
-    $webroot_location_group = 'www-data'
-    $vhost_docroot_group    = undef
-  } else {
-    $webroot_location_group = undef
-    $vhost_docroot_group    = 'www-user'
-  }
-
-  if ! defined(File[$webroot_location]) {
-    file { $webroot_location:
+  if ! defined(File[$www_location]) {
+    file { $www_location:
       ensure  => directory,
-      group   => $webroot_location_group,
-      mode    => 0775,
-      require => [
-        Exec["mkdir -p ${webroot_location}"],
-        Group['www-data']
-      ],
+      owner   => 'root',
+      group   => $webroot_group,
+      mode    => '0775',
+      before  => Class['nginx'],
+      require => Group[$webroot_group],
     }
   }
 
@@ -56,10 +39,10 @@ if hash_key_equals($nginx_values, 'install', 1) {
   if $::osfamily == 'redhat' {
     file { '/usr/share/nginx':
       ensure  => directory,
-      mode    => 0775,
-      owner   => 'www-data',
-      group   => 'www-data',
-      require => Group['www-data'],
+      mode    => '0775',
+      owner   => $webroot_user,
+      group   => $webroot_group,
+      require => Group[$webroot_group],
       before  => Package['nginx']
     }
   }
@@ -68,35 +51,50 @@ if hash_key_equals($nginx_values, 'install', 1) {
     or hash_key_equals($php_values, 'install', 1)
   {
     $default_vhost = {
-      'server_name'    => '_',
-      'server_aliases' => [],
-      'www_root'       => '/var/www/html',
-      'listen_port'    => 80,
-      'location'       => '\.php$',
-      'index_files'    => ['index', 'index.html', 'index.htm', 'index.php'],
-      'envvars'        => [],
-      'ssl'            => '0',
-      'ssl_cert'       => '',
-      'ssl_key'        => '',
-      'engine'         => 'php',
+      'server_name'          => '_',
+      'server_aliases'       => [],
+      'www_root'             => $puphpet::params::nginx_webroot_location,
+      'proxy'                => '',
+      'listen_port'          => 80,
+      'location'             => '\.php$',
+      'location_prepend'     => [],
+      'location_append'      => [],
+      'index_files'          => [
+        'index', 'index.html', 'index.htm', 'index.php'
+      ],
+      'envvars'              => [],
+      'ssl'                  => '0',
+      'ssl_cert'             => '',
+      'ssl_key'              => '',
+      'engine'               => 'php',
+      'client_max_body_size' => '1m'
     }
   } else {
     $default_vhost = {
-      'server_name'    => '_',
-      'server_aliases' => [],
-      'www_root'       => '/var/www/html',
-      'listen_port'    => 80,
-      'location'       => '/',
-      'index_files'    => ['index', 'index.html', 'index.htm'],
-      'envvars'        => [],
-      'ssl'            => '0',
-      'ssl_cert'       => '',
-      'ssl_key'        => '',
-      'engine'         => false,
+      'server_name'          => '_',
+      'server_aliases'       => [],
+      'www_root'             => $puphpet::params::nginx_webroot_location,
+      'proxy'                => '',
+      'listen_port'          => 80,
+      'location'             => '/',
+      'location_prepend'     => [],
+      'location_append'      => [],
+      'index_files'          => ['index', 'index.html', 'index.htm'],
+      'envvars'              => [],
+      'ssl'                  => '0',
+      'ssl_cert'             => '',
+      'ssl_key'              => '',
+      'engine'               => false,
+      'client_max_body_size' => '1m'
     }
   }
 
-  class { 'nginx': }
+  # Merges into empty array for now
+  $nginx_settings = delete(merge({},
+    $nginx_values['settings']
+  ), 'default_vhost')
+
+  create_resources('class', { 'nginx' => $nginx_settings })
 
   if hash_key_equals($nginx_values['settings'], 'default_vhost', 1) {
     $nginx_vhosts = merge($nginx_values['vhosts'], {
@@ -114,126 +112,56 @@ if hash_key_equals($nginx_values, 'install', 1) {
     $nginx_vhosts = $nginx_values['vhosts']
   }
 
-  if count($nginx_vhosts) > 0 {
-    each( $nginx_vhosts ) |$key, $vhost| {
+  each( $nginx_vhosts ) |$key, $vhost| {
+    if ! defined($vhost['proxy']) or $vhost['proxy'] == '' {
       exec { "exec mkdir -p ${vhost['www_root']} @ key ${key}":
         command => "mkdir -p ${vhost['www_root']}",
+        user    => $webroot_user,
+        group   => $webroot_group,
         creates => $vhost['www_root'],
+        require => File[$www_location],
       }
 
       if ! defined(File[$vhost['www_root']]) {
         file { $vhost['www_root']:
           ensure  => directory,
-          group   => $vhost_docroot_group,
-          mode    => 0765,
-          require => [
-            Exec["exec mkdir -p ${vhost['www_root']} @ key ${key}"],
-            Group['www-user']
-          ]
-        }
-      }
-
-      if ! defined(Firewall["100 tcp/${vhost['listen_port']}"]) {
-        firewall { "100 tcp/${vhost['listen_port']}":
-          port   => $vhost['listen_port'],
-          proto  => tcp,
-          action => 'accept',
+          mode    => '0775',
+          require => Exec["exec mkdir -p ${vhost['www_root']} @ key ${key}"],
         }
       }
     }
 
-    create_resources(nginx_vhost, $nginx_vhosts)
+    if ! defined(Puphpet::Firewall::Port[$vhost['listen_port']]) {
+      puphpet::firewall::port { $vhost['listen_port']: }
+    }
+
+    $vhost_merged = merge($vhost, {
+      'fcgi_string' => $fcgi_string,
+    })
+
+    create_resources(puphpet::nginx::host, { "${key}" => $vhost_merged })
   }
 
-  if ! defined(Firewall['100 tcp/443']) {
-    firewall { '100 tcp/443':
-      port   => 443,
-      proto  => tcp,
-      action => 'accept',
+  if ! defined(Puphpet::Firewall::Port['443']) {
+    puphpet::firewall::port { '443': }
+  }
+
+  if is_hash($nginx_values['upstreams'])
+    and count($nginx_values['upstreams']) > 0
+  {
+    notify{ 'Adding upstreams': }
+    create_resources(puphpet::nginx::upstream, $nginx_values['upstreams'])
+  }
+
+  if defined(File[$puphpet::params::nginx_webroot_location]) {
+    file { "${puphpet::params::nginx_webroot_location}/index.html":
+      ensure  => present,
+      owner   => 'root',
+      group   => $webroot_group,
+      mode    => '0664',
+      source  => 'puppet:///modules/puphpet/webserver_landing.erb',
+      replace => true,
+      require => File[$puphpet::params::nginx_webroot_location],
     }
   }
 }
-
-define nginx_vhost (
-  $server_name,
-  $server_aliases   = [],
-  $www_root,
-  $listen_port,
-  $location,
-  $index_files,
-  $envvars          = [],
-  $ssl              = false,
-  $ssl_cert         = $puphpet::params::ssl_cert_location,
-  $ssl_key          = $puphpet::params::ssl_key_location,
-  $ssl_port         = '443',
-  $rewrite_to_https = false,
-  $spdy             = $nginx::params::nx_spdy,
-  $engine           = false,
-){
-  $merged_server_name = concat([$server_name], $server_aliases)
-
-  if is_array($index_files) and count($index_files) > 0 {
-    $try_files_prepend = $index_files[count($index_files) - 1]
-  } else {
-    $try_files_prepend = ''
-  }
-
-  if $engine == 'php' {
-    $try_files               = "${try_files_prepend} /index.php\$is_args\$args"
-    $fastcgi_split_path_info = '^(.+\.php)(/.*)$'
-    $fastcgi_index           = 'index.php'
-    $fastcgi_param           = concat([
-      'SCRIPT_FILENAME $request_filename'
-    ], $envvars)
-    $fastcgi_pass_hash       = value_true($fcgi_string) ? { true => {'fastcgi_pass' => $fcgi_string}, default => {} }
-  } else {
-    $try_files               = "${try_files_prepend} /index.html"
-    $fastcgi_split_path_info = '^(.+\.html)(/.+)$'
-    $fastcgi_index           = 'index.html'
-    $fastcgi_param           = $envvars
-    $fastcgi_pass_hash       = {}
-  }
-
-  $ssl_set              = value_true($ssl)              ? { true => true,      default => false, }
-  $ssl_cert_set         = value_true($ssl_cert)         ? { true => $ssl_cert, default => $puphpet::params::ssl_cert_location, }
-  $ssl_key_set          = value_true($ssl_key)          ? { true => $ssl_key,  default => $puphpet::params::ssl_key_location, }
-  $ssl_port_set         = value_true($ssl_port)         ? { true => $ssl_port, default => '443', }
-  $rewrite_to_https_set = value_true($rewrite_to_https) ? { true => true,      default => false, }
-  $spdy_set             = value_true($spdy)             ? { true => on,        default => off, }
-
-  $location_cfg_append  = merge({
-    'fastcgi_split_path_info' => $fastcgi_split_path_info,
-    'fastcgi_param'           => $fastcgi_param,
-    'fastcgi_index'           => $fastcgi_index,
-    'include'                 => 'fastcgi_params'
-  }, $fastcgi_pass_hash)
-
-  nginx::resource::vhost { $server_name:
-    server_name      => $merged_server_name,
-    www_root         => $www_root,
-    listen_port      => $listen_port,
-    index_files      => $index_files,
-    try_files        => ['$uri', '$uri/', "${try_files}"],
-    ssl              => $ssl_set,
-    ssl_cert         => $ssl_cert_set,
-    ssl_key          => $ssl_key_set,
-    ssl_port         => $ssl_port_set,
-    rewrite_to_https => $rewrite_to_https_set,
-    spdy             => $spdy_set,
-    vhost_cfg_append => {sendfile => 'off'}
-  }
-
-  if $engine == 'php' {
-    nginx::resource::location { "${server_name}-php":
-      ensure              => present,
-      vhost               => $server_name,
-      location            => "~ ${location}",
-      proxy               => undef,
-      ssl                 => $ssl_set,
-      www_root            => $www_root,
-      location_cfg_append => $location_cfg_append,
-      notify              => Class['nginx::service'],
-    }
-  }
-}
-
