@@ -1,6 +1,6 @@
 # Vagrant Installation
 
-*Note:* Copy past commands one at a time!
+*Note:* Copy paste commands one at a time!
 
 ## Cygwin (Windows only)
 
