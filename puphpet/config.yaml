@@ -30,8 +30,8 @@ vagrantfile-local:
                     - '--parser future'
         synced_folder:
             8bF9hNSJ1VSs:
-                owner: ''
-                group: ''
+                owner: www-data
+                group: www-data
                 source: ./
                 target: /var/www
                 sync_type: nfs
@@ -87,6 +87,8 @@ apache:
     vhosts:
         sf5whlgzyb1r:
             servername: nfqakademija.dev
+            serveraliases:
+                - www.nfqakademija.dev
             docroot: /var/www/nfqakademija/web
             port: '80'
             setenv:
