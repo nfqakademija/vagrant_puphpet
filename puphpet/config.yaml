@@ -29,7 +29,9 @@ vagrantfile-local:
                     - '--hiera_config /vagrant/puphpet/puppet/hiera.yaml'
                     - '--parser future'
         synced_folder:
-            xCTJCqeHDPsR:
+            8bF9hNSJ1VSs:
+                owner: www-data
+                group: www-data
                 source: ./
                 target: /var/www
                 sync_type: nfs
@@ -61,9 +63,16 @@ server:
     packages:
         - htop
         - vim
+users_groups:
+    install: '1'
+    groups: {  }
+    users: {  }
+cron:
+    install: '1'
+    jobs: {  }
 firewall:
     install: '1'
-    rules: null
+    rules: {  }
 apache:
     install: '1'
     settings:
@@ -76,19 +85,28 @@ apache:
     modules:
         - rewrite
     vhosts:
-        vitexconsole:
+        sf5whlgzyb1r:
             servername: nfqakademija.dev
-            serveraliases: []
+            serveraliases:
+                - www.nfqakademija.dev
             docroot: /var/www/nfqakademija/web
             port: '80'
             setenv:
                 - 'APP_ENV dev'
-            override:
-                - All
-            options:
-                - Indexes
-                - FollowSymLinks
-                - MultiViews
+            directories:
+                s2a1xn5vtg26:
+                    provider: directory
+                    path: /var/www/nfqakademija/web
+                    options:
+                        - Indexes
+                        - FollowSymlinks
+                        - MultiViews
+                    allow_override:
+                        - All
+                    require:
+                        - all
+                        - granted
+                    custom_fragment: ''
             engine: php
             custom_fragment: ''
             ssl_cert: ''
@@ -102,8 +120,10 @@ nginx:
         default_vhost: 1
         proxy_buffer_size: 128k
         proxy_buffers: '4 256k'
+    upstreams: {  }
     vhosts:
-        Qf09NrQOpQ91:
+        a00jzjiucfda:
+            proxy: ''
             server_name: awesome.dev
             server_aliases:
                 - www.awesome.dev
@@ -117,6 +137,7 @@ nginx:
             envvars:
                 - 'APP_ENV dev'
             engine: php
+            client_max_body_size: 1m
             ssl_cert: ''
             ssl_key: ''
 php:
@@ -168,20 +189,20 @@ xdebug:
         xdebug.remote_enable: '1'
         xdebug.remote_handler: dbgp
         xdebug.remote_port: '9000'
-        xdebug.remote_host: '192.168.59.1'
+        xdebug.remote_host: 192.168.59.1
 xhprof:
     install: '0'
+wpcli:
+    install: '0'
+    version: ''
 drush:
     install: '0'
     version: 6.3.0
 ruby:
     install: '1'
     versions:
-        1JM4KdOvbxCO:
+        6GcMfkkAKJSw:
             version: ''
-    gems:
-        - sass
-        - compass
 nodejs:
     install: '1'
     npm_packages: {  }
@@ -189,14 +210,16 @@ python:
     install: '1'
     packages: {  }
     versions:
-        JCKiqqDgGLRd:
+        Pvo2p3E0xZhs:
             version: ''
 mysql:
     install: '1'
-    root_password: passwordpassword
-    adminer: '0'
+    settings:
+        override_options: {  }
+        root_password: '123'
+    adminer: 0
     databases:
-        ghGESXnKefTQ:
+        33MXSzUILAyK:
             grant:
                 - ALL
             name: nfqakademija
@@ -215,10 +238,11 @@ postgresql:
     adminer: 0
 mariadb:
     install: '0'
-    root_password: '123'
+    settings:
+        override_options: {  }
+        root_password: '123'
     adminer: 0
     databases: {  }
-    version: '10.0'
 sqlite:
     install: '0'
     adminer: 0
@@ -261,6 +285,11 @@ rabbitmq:
 elastic_search:
     install: '0'
     settings:
+        version: null
         java_install: true
-        autoupgrade: true
+solr:
+    install: '0'
+    settings:
+        version: ''
+        port: ''
 

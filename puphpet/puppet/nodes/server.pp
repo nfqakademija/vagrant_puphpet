@@ -10,26 +10,44 @@ group { 'puppet':   ensure => present }
 group { 'www-data': ensure => present }
 group { 'www-user': ensure => present }
 
-user { $::ssh_username:
-  shell   => '/bin/bash',
-  home    => "/home/${::ssh_username}",
-  ensure  => present,
-  groups  => ['www-data', 'www-user'],
-  require => [Group['www-data'], Group['www-user']]
+case $::ssh_username {
+  'root': {
+    $user_home   = '/root'
+    $manage_home = false
+  }
+  default: {
+    $user_home   = "/home/${::ssh_username}"
+    $manage_home = true
+  }
 }
 
-user { ['apache', 'nginx', 'httpd', 'www-data']:
-  shell  => '/bin/bash',
-  ensure => present,
-  groups => 'www-data',
-  require => Group['www-data']
+@user { $::ssh_username:
+  ensure     => present,
+  shell      => '/bin/bash',
+  home       => $user_home,
+  managehome => $manage_home,
+  groups     => ['www-data', 'www-user'],
+  require    => [Group['www-data'], Group['www-user']],
+}
+
+User[$::ssh_username]
+
+each( ['apache', 'nginx', 'httpd', 'www-data', 'www-user'] ) |$key| {
+  if ! defined(User[$key]) {
+    user { $key:
+      ensure  => present,
+      shell   => '/bin/bash',
+      groups  => 'www-data',
+      require => Group['www-data']
+    }
+  }
 }
 
 # copy dot files to ssh user's home directory
 exec { 'dotfiles':
-  cwd     => "/home/${::ssh_username}",
-  command => "cp -r /vagrant/puphpet/files/dot/.[a-zA-Z0-9]* /home/${::ssh_username}/ \
-              && chown -R ${::ssh_username} /home/${::ssh_username}/.[a-zA-Z0-9]* \
+  cwd     => $user_home,
+  command => "cp -r /vagrant/puphpet/files/dot/.[a-zA-Z0-9]* ${user_home}/ \
+              && chown -R ${::ssh_username} ${user_home}/.[a-zA-Z0-9]* \
               && cp -r /vagrant/puphpet/files/dot/.[a-zA-Z0-9]* /root/",
   onlyif  => 'test -d /vagrant/puphpet/files/dot',
   returns => [0, 1],
@@ -72,7 +90,10 @@ case $::osfamily {
       }
     }
 
-    link_dot_files { 'do': }
+    puphpet::server::link_dotfiles { $user_home: }
+  }
+  default: {
+    error('PuPHPet currently only works with Debian and RHEL families')
   }
 }
 
@@ -80,7 +101,15 @@ case $::operatingsystem {
   'debian': {
     include apt::backports
 
-    add_dotdeb { 'packages.dotdeb.org': release => $::lsbdistcodename }
+    apt::source { 'packages.dotdeb.org-repo.puphpet':
+      location          => 'http://repo.puphpet.com/dotdeb/',
+      release           => $::lsbdistcodename,
+      repos             => 'all',
+      required_packages => 'debian-keyring debian-archive-keyring',
+      key               => '89DF5277',
+      key_server        => 'hkp://keyserver.ubuntu.com:80',
+      include_src       => true
+    }
 
     $server_lsbdistcodename = downcase($::lsbdistcodename)
 
@@ -91,71 +120,34 @@ case $::operatingsystem {
   }
   'ubuntu': {
     if ! defined(Apt::Key['4F4EA0AAE5267A6C']){
-      apt::key { '4F4EA0AAE5267A6C': key_server => 'hkp://keyserver.ubuntu.com:80' }
+      apt::key { '4F4EA0AAE5267A6C':
+        key_server => 'hkp://keyserver.ubuntu.com:80'
+      }
     }
     if ! defined(Apt::Key['4CBEDD5A']){
       apt::key { '4CBEDD5A': key_server => 'hkp://keyserver.ubuntu.com:80' }
     }
 
     if $::lsbdistcodename in ['lucid', 'precise'] {
-      apt::ppa { 'ppa:pdoes/ppa': require => Apt::Key['4CBEDD5A'], options => '' }
+      apt::ppa { 'ppa:pdoes/ppa':
+        require => Apt::Key['4CBEDD5A'],
+        options => ''
+      }
     } else {
       apt::ppa { 'ppa:pdoes/ppa': require => Apt::Key['4CBEDD5A'] }
     }
   }
   'redhat', 'centos': {
   }
+  default: {
+    error('PuPHPet supports Debian, Ubuntu, CentOS and RHEL only')
+  }
 }
 
-if is_array($server_values['packages']) and count($server_values['packages']) > 0 {
-  each( $server_values['packages'] ) |$package| {
-    if ! defined(Package[$package]) {
-      package { $package:
-        ensure => present,
-      }
+each( $server_values['packages'] ) |$package| {
+  if ! defined(Package[$package]) {
+    package { $package:
+      ensure => present,
     }
   }
 }
-
-define add_dotdeb ($release){
-   apt::source { "${name}-repo.puphpet":
-    location          => 'http://repo.puphpet.com/dotdeb/',
-    release           => $release,
-    repos             => 'all',
-    required_packages => 'debian-keyring debian-archive-keyring',
-    key               => '89DF5277',
-    key_server        => 'keys.gnupg.net',
-    include_src       => true
-  }
-}
-
-define link_dot_files {
-  file_line { 'link ~/.bash_git':
-    ensure  => present,
-    line    => 'if [ -f ~/.bash_git ] ; then source ~/.bash_git; fi',
-    path    => "/home/${::ssh_username}/.bash_profile",
-    require => Exec['dotfiles'],
-  }
-
-  file_line { 'link ~/.bash_git for root':
-    ensure  => present,
-    line    => 'if [ -f ~/.bash_git ] ; then source ~/.bash_git; fi',
-    path    => '/root/.bashrc',
-    require => Exec['dotfiles'],
-  }
-
-  file_line { 'link ~/.bash_aliases':
-    ensure  => present,
-    line    => 'if [ -f ~/.bash_aliases ] ; then source ~/.bash_aliases; fi',
-    path    => "/home/${::ssh_username}/.bash_profile",
-    require => Exec['dotfiles'],
-  }
-
-  file_line { 'link ~/.bash_aliases for root':
-    ensure  => present,
-    line    => 'if [ -f ~/.bash_aliases ] ; then source ~/.bash_aliases; fi',
-    path    => '/root/.bashrc',
-    require => Exec['dotfiles'],
-  }
-}
-
