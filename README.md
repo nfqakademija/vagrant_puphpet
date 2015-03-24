@@ -25,6 +25,11 @@ vagrant plugin install vagrant-hostmanager
 vagrant plugin install vagrant-bindfs # MacOSX and Linux only
 ```
 
+
+```sh
+sudo apt-get install nfs-kernel-server # Linux only (Ubuntu / Debian)
+```
+
 Clone this repository.
 
 Run `vagrant up`. This will take 5 - 20 minutes. Monitor and allow admin access multiple times during first few minutes.
