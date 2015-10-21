@@ -53,7 +53,7 @@ Update configuration so that `/app_dev.php/` URL part would not be required:
 ```sh
 cd /var/www/nfqakademija
 sed 's/app.php/app_dev.php/g' web/.htaccess > /tmp/foo_bar_htaccess && /bin/cp /tmp/foo_bar_htaccess web/.htaccess
-sed "s/'::1'/'::1', '192.168.59.1'/g" web/app_dev.php > /tmp/foo_bar_app_dev && /bin/cp /tmp/foo_bar_app_dev web/app_dev.php
+sed "s/'::1'/'::1', '192.168.56.1'/g" web/app_dev.php > /tmp/foo_bar_app_dev && /bin/cp /tmp/foo_bar_app_dev web/app_dev.php
 ```
 
 Visit: http://nfqakademija.dev/. It should output nicely formatted Symfony hello page.
