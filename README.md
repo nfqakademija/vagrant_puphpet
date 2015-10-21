@@ -34,7 +34,7 @@ Clone this repository.
 
 Run `vagrant up`. This will take 5 - 20 minutes. Monitor and allow admin access multiple times during first few minutes.
 
-Visit http://nfqakademija.dev and check that `File not found.` message has been printed to browser.
+Visit http://nfqakademija.dev and check that you see "everything is awesome". Also visit /info.php to see if php is working.
 
 ## Symfony
 
