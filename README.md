@@ -42,23 +42,21 @@ Install Symfony:
 
 ```sh
 vagrant ssh
-cd /var/www/
-rm -rf nfqakademija/
-composer create-project symfony/framework-standard-edition nfqakademija
+cd /tmp
+composer create-project symfony/framework-standard-edition
+cp -r -n /tmp/framework-standard-edition/* /var/www/nfqakademija/
+cat /tmp/framework-standard-edition/.gitignore >> /var/www/nfqakademija/.gitignore
 ```
 
 Update configuration so that `/app_dev.php/` URL part would not be required:
 
 ```sh
+cd /var/www/nfqakademija
 sed 's/app.php/app_dev.php/g' web/.htaccess > /tmp/foo_bar_htaccess && /bin/cp /tmp/foo_bar_htaccess web/.htaccess
 sed "s/'::1'/'::1', '192.168.59.1'/g" web/app_dev.php > /tmp/foo_bar_app_dev && /bin/cp /tmp/foo_bar_app_dev web/app_dev.php
 ```
 
-Visit: http://nfqakademija.dev/demo/hello/Jonas. It should output nicely formatted page.
-
-## PHPStorm
-
-PHPStorm open: {PATH}/nfqakademija/nfqakademija
+Visit: http://nfqakademija.dev/. It should output nicely formatted Symfony hello page.
 
 ## If NFS fails
 
