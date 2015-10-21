@@ -3,7 +3,7 @@ vagrantfile:
     vm:
         box: puphpet/debian75-x64
         box_url: puphpet/debian75-x64
-        hostname: nfqakademija.dev
+        hostname: local.puphpet
         memory: '512'
         cpus: '1'
         chosen_provider: virtualbox
@@ -35,7 +35,7 @@ vagrantfile:
         synced_folder:
             vflsf_or38nuyxubu8:
                 source: ./
-                target: /var/www
+                target: /var/www/nfqakademija
                 sync_type: nfs
                 smb:
                     smb_host: ''
@@ -162,7 +162,7 @@ apache:
             servername: nfqakademija.dev
             serveraliases:
                 - www.nfqakademija.dev
-            docroot: /var/www/web
+            docroot: /var/www/nfqakademija/web
             port: '80'
             setenv:
                 - 'APP_ENV dev'
@@ -176,7 +176,7 @@ apache:
             ssl_cipher: ''
             directories:
                 avd_j5oy6ogmgp55:
-                    path: /var/www/web
+                    path: /var/www/nfqakademija/web
                     options:
                         - Indexes
                         - FollowSymlinks
